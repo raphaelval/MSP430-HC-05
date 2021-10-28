@@ -1,7 +1,7 @@
 #include <msp430.h> 
 #include <string.h>
 
-#define UARTReceive UCA0RXBUF;
+#define UARTReceive UCA0RXBUF;                  // Set RXD as UARTReceive
 
 /**
  * main.c
@@ -11,7 +11,6 @@
 
 void UARTSendArray(unsigned char *TxArray);
 void UARTSendChar(unsigned char *c);
-//unsigned char UARTReceive(void);
 
 static unsigned char data;
 int flag = 0;
@@ -38,10 +37,6 @@ void main(void)
     IE2 |= UCA0RXIE;                            // Enable USCI_A0 RX interrupt
 
     __bis_SR_register(LPM0_bits | GIE);         // enter LPM0 with interrupt enable
-
-    /*while (1)
-    {
-    }*/
 }
 
 // Echo back RXed character, confirm TX buffer is ready first
@@ -99,29 +94,19 @@ __interrupt void USCI0RX_ISR(void)
 }
 
 void UARTSendChar(unsigned char *c){
- // Send number of bytes Specified in ArrayLength in the array at using the hardware UART 0
- // Example usage: UARTSendArray("Hello", 5);
- // int data[2]={1023, 235};
- // UARTSendArray(data, 4); // Note because the UART transmits bytes it is necessary to send two bytes for each integer hence the
- // data length is twice the array length
 
      while(!(IFG2 & UCA0TXIFG));            // Wait for TX buffer to be ready for new data
      UCA0TXBUF = *c;                        // Send Character that is at location of pointer
      c++;
+
 }
 
 void UARTSendArray(unsigned char *TxArray){
- // Send number of bytes Specified in ArrayLength in the array at using the hardware UART 0
- // Example usage: UARTSendArray("Hello", 5);
- // int data[2]={1023, 235};
- // UARTSendArray(data, 4); // Note because the UART transmits bytes it is necessary to send two bytes for each integer hence the
- // data length is twice the array length
-
-
 
     while(*TxArray){                        // Loop until StringLength == 0 and post decrement
         while(!(IFG2 & UCA0TXIFG));         // Wait for TX buffer to be ready for new data
         UCA0TXBUF = *TxArray;               // Send Character that is at location of pointer
         TxArray++;                          // Increment the TxString pointer to point to the next character
     }
+
 }
