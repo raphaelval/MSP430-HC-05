@@ -5,12 +5,16 @@
 
 /**
  * main.c
+ * Sample Code showing the use of: UART, Rx Bluetooth Input, Tx Bluetooth Output
+ * Raphael Valente
  */
 
 void UARTSendArray(unsigned char *TxArray);
+void UARTSendChar(unsigned char *c);
 //unsigned char UARTReceive(void);
 
 static unsigned char data;
+int flag = 0;
 
 void main(void)
 
@@ -33,56 +37,77 @@ void main(void)
     UCA0CTL1 &= ~UCSWRST;                       // Initialize USCI state machine
     IE2 |= UCA0RXIE;                            // Enable USCI_A0 RX interrupt
 
-    __bis_SR_register(LPM0_bits + GIE);       // Enter LPM0, interrupts enabled
+    __bis_SR_register(LPM0_bits | GIE);         // enter LPM0 with interrupt enable
 
-
+    /*while (1)
+    {
+    }*/
 }
 
 // Echo back RXed character, confirm TX buffer is ready first
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void)
 {
-
-    data = UARTReceive;
-    //*data = UCA0RXBUF;
-    UARTSendArray("Received command: ");
-    UARTSendArray(&data);
-    UARTSendArray("\n");
-
-    //__bic_SR_register_on_exit(LPM0_bits);
+    data = UARTReceive;                                     // Receives data from UART RXD
+    unsigned int bytesToSend = strlen((const char*) data);  // Number of bytes in data;
 
     switch(data){
-        case 'G':
+        case 'G':                                           // You chose "data"
         {
-            P1OUT |= BIT0;
+            UARTSendArray("Green LED is on");
+            //UARTSendChar(&data);                          // Send data to UART TXD
+            UARTSendArray("\n");
+            P1OUT |= BIT0;                                  // Turn on LED P1.0
         }
         break;
         case 'g':
         {
-            P1OUT &= ~BIT0;
+            UARTSendArray("Green LED is off");
+            //UARTSendChar(&data);                          // Send data to UART TXD
+            UARTSendArray("\n");
+            P1OUT &= ~BIT0;                                 // Turn off LED P1.0
         }
         break;
         case 'R':
         {
-            P1OUT |= BIT6;
+            UARTSendArray("Red LED is on");
+            //UARTSendChar(&data);                          // Send data to UART TXD
+            UARTSendArray("\n");
+            P1OUT |= BIT6;                                  // Turn on LED P1.6
         }
         break;
         case 'r':
         {
-            P1OUT &= ~BIT6;
+            UARTSendArray("Red LED is off");
+            //UARTSendChar(&data);                          // Send data to UART TXD
+            UARTSendArray("\n");
+            P1OUT &= ~BIT6;                                 // Turn off LED P1.6
         }
         break;
-        default:
+        default:                                            // Command "data" invalid
         {
-            //UARTSendArray("Unknown Command: ");
-            UARTSendArray(&data);
-            //UARTSendArray("\n");
+            UARTSendArray("Command ");
+            UARTSendChar(&data);
+            UARTSendArray(" invalid.\n");
         }
         break;
 
     }
-    //__bic_SR_register_on_exit(LPM0_bits);
 
+    IFG2 &= ~UCA0RXIFG;             // Turn off interrupt flag
+
+}
+
+void UARTSendChar(unsigned char *c){
+ // Send number of bytes Specified in ArrayLength in the array at using the hardware UART 0
+ // Example usage: UARTSendArray("Hello", 5);
+ // int data[2]={1023, 235};
+ // UARTSendArray(data, 4); // Note because the UART transmits bytes it is necessary to send two bytes for each integer hence the
+ // data length is twice the array length
+
+     while(!(IFG2 & UCA0TXIFG));            // Wait for TX buffer to be ready for new data
+     UCA0TXBUF = *c;                        // Send Character that is at location of pointer
+     c++;
 }
 
 void UARTSendArray(unsigned char *TxArray){
@@ -92,20 +117,11 @@ void UARTSendArray(unsigned char *TxArray){
  // UARTSendArray(data, 4); // Note because the UART transmits bytes it is necessary to send two bytes for each integer hence the
  // data length is twice the array length
 
-    while(*TxArray != '\0'){                        // Loop until StringLength == 0 and post decrement
+
+
+    while(*TxArray){                        // Loop until StringLength == 0 and post decrement
         while(!(IFG2 & UCA0TXIFG));         // Wait for TX buffer to be ready for new data
-        UCA0TXBUF = *TxArray;               //Write the character at the location specified by the pointer
-        TxArray++;                          //Increment the TxString pointer to point to the next character
+        UCA0TXBUF = *TxArray;               // Send Character that is at location of pointer
+        TxArray++;                          // Increment the TxString pointer to point to the next character
     }
-}
-
-void uart_putc(unsigned char c)             // print to PC over TX one character at a time.
-{
-    while (!(IFG2 & UCA0TXIFG));            // USCI_A0 TX buffer ready?
-    UCA0TXBUF = c;                          // TX
-}
-
-void uart_puts(const char *str)             // print any string message to PC with this function.
-{
-     while(*str) uart_putc(*str++);
 }
