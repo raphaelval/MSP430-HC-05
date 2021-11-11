@@ -1,48 +1,57 @@
-#include <msp430.h> 
-#include <string.h>
-
-#define UARTReceive UCA0RXBUF;                  // Set RXD as UARTReceive
-
 /**
  * main.c
  * Sample Code showing the use of: UART, Rx Bluetooth Input, Tx Bluetooth Output
  * Raphael Valente
  */
 
+#include <msp430.h> 
+#include <string.h>
+
+/*  UART  */
+#define UARTReceive UCA0RXBUF;                  // Set RXD as UARTReceive
+
 void UARTSendArray(unsigned char *TxArray);
 void UARTSendChar(unsigned char *c);
 void configureADC();
 void getanalogvalues();
 int getADCValue(int port);
-int getEngineTemp();
 
 static unsigned char data;
 int flag = 0;
 int i = 0;
 int temp = 0;
 int temproom = 0;
-int ADCReading [1];
+int tempReading;
+
+/*  NOTES  */
+// P1.0 IN: Temp Sensor
+// P1.7 OUT: Buzzer
+// P2.2 OUT: Servo
 
 void main(void)
 
 {
-    WDTCTL = WDTPW + WDTHOLD;                   // Stop WDT
+    WDTCTL = WDTPW + WDTHOLD;                  // Stop WDT
 
-    P1DIR |= BIT6;                          // Set the LEDs on P1.0, P1.6 as outputs
-    P1OUT |= BIT6;                          // Set the P1.6 LED
-
-    BCSCTL1 = CALBC1_1MHZ;                      // Set DCO to 1MHz
-    DCOCTL = CALDCO_1MHZ;                       // Set DCO to 1MHz
+    P1DIR |= BIT6 + BIT7;                      // Set the LEDs on P1.6, P1.7 as outputs
+    P1OUT |= BIT6;                             // Set the P1.6 LED
+    P1OUT &= ~BIT7;                            // Set P1.7 Buzzer OFF
 
     /* Configure hardware UART */
     P1SEL = BIT1 + BIT2;                       // P1.1 = RXD, P1.2=TXD
     P1SEL2 = BIT1 + BIT2;                      // P1.1 = RXD, P1.2=TXD
-    UCA0CTL1 |= UCSSEL_2;                       // Use SMCLK
-    UCA0BR0 = 104;                              // Set baud rate to 9600 with 1MHz clock (Data Sheet 15.3.13)
-    UCA0BR1 = 0;                                // Set baud rate to 9600 with 1MHz clock
-    UCA0MCTL = UCBRS0;                          // Modulation UCBRSx = 1
-    UCA0CTL1 &= ~UCSWRST;                       // Initialize USCI state machine
-    IE2 |= UCA0RXIE;                            // Enable USCI_A0 RX interrupt
+    UCA0CTL1 |= UCSSEL_2;                      // Use SMCLK
+    UCA0BR0 = 104;                             // Set baud rate to 9600 with 1MHz clock (Data Sheet 15.3.13)
+    UCA0BR1 = 0;                               // Set baud rate to 9600 with 1MHz clock
+    UCA0MCTL = UCBRS0;                         // Modulation UCBRSx = 1
+    UCA0CTL1 &= ~UCSWRST;                      // Initialize USCI state machine
+    IE2 |= UCA0RXIE;                           // Enable USCI_A0 RX interrupt
+
+    /* Configure PWM */
+    BCSCTL1= CALBC1_1MHZ;
+    DCOCTL = CALDCO_1MHZ;
+    P2DIR |= BIT2;
+    P2SEL |= BIT2;  //selection for timer setting
 
     __delay_cycles(2000000);
 
@@ -54,62 +63,81 @@ void main(void)
     __delay_cycles(250);
 
     //__bis_SR_register(LPM0_bits | GIE);         // enter LPM0 with interrupt enable
+    __enable_interrupt();
 
     for(;;){
 
+        TA1CCR0 = 20000;  //PWM period
+
         getanalogvalues();
 
-        if ( temp > temproom * 1.02 ) {
-            P1OUT |=  BIT6;
+        if ( temp > temproom * 1.05 ) {
+            P1OUT ^=  BIT7;                       // Toggle Buzzer
+            __delay_cycles(500000);               // Every 0.5 Second
+        }
+        else if(temp < temproom * 1.03 ){
+            //P1OUT &= ~BIT6;
+            P1OUT &= ~BIT7;
             __delay_cycles(200);
-        }    // LED on
-        else if(temp < temproom * 1.01 ){
-            P1OUT &= ~BIT6;
-            __delay_cycles(200);
-        }    // LED off
+        }
 
     }
 
 }
 
-// Echo back RXed character, confirm TX buffer is ready first
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void)
 {
     data = UARTReceive;                                     // Receives data from UART RXD
     unsigned int bytesToSend = strlen((const char*) data);  // Number of bytes in data;
 
-    switch(data){
-        case 'G':                                           // You chose "data"
+    switch(data){                                           // You chose "data"
+        case 'G':   //
         {
             UARTSendArray("Green LED is on");
-            //UARTSendChar(&data);                          // Send data to UART TXD
             UARTSendArray("\n");
-            P1OUT |= BIT0;                                  // Turn on LED P1.0
+            //P1OUT |= BIT0;                                // Turn on LED P1.0
         }
         break;
-        case 'g':
+        case 'g':   //
         {
             UARTSendArray("Green LED is off");
-            //UARTSendChar(&data);                          // Send data to UART TXD
             UARTSendArray("\n");
-            P1OUT &= ~BIT0;                                 // Turn off LED P1.0
+            //P1OUT &= ~BIT0;                               // Turn off LED P1.0
         }
         break;
-        case 'R':
+        case 'R':   //
         {
             UARTSendArray("Red LED is on");
-            //UARTSendChar(&data);                          // Send data to UART TXD
             UARTSendArray("\n");
             P1OUT |= BIT6;                                  // Turn on LED P1.6
         }
         break;
-        case 'r':
+        case 'r':   //
         {
             UARTSendArray("Red LED is off");
-            //UARTSendChar(&data);                          // Send data to UART TXD
             UARTSendArray("\n");
             P1OUT &= ~BIT6;                                 // Turn off LED P1.6
+        }
+        break;
+        case 'u':   // Unlock
+        {
+            UARTSendArray("Unlocked");
+            UARTSendArray("\n");
+            // UNLOCK
+            TA1CCR1 = 700;  //CCR1 PWM Duty Cycle
+            TA1CCTL1 = OUTMOD_7;  //CCR1 selection reset-set
+            TA1CTL = TASSEL_2|MC_1;   //SMCLK submain clock,upmode
+        }
+        break;
+        case 'l':   // Lock
+        {
+            UARTSendArray("Locked");
+            UARTSendArray("\n");
+            // LOCK
+            TA1CCR1 = 1700;
+            TA1CCTL1 = OUTMOD_7;  //CCR1 selection reset-set
+            TA1CTL = TASSEL_2|MC_1;
         }
         break;
         default:                                            // Command "data" invalid
@@ -142,10 +170,10 @@ void getanalogvalues()
     {
         ADC10CTL0 &= ~ENC;
         while (ADC10CTL1 & BUSY);                     //Wait while ADC is busy
-        ADC10SA = (unsigned)&ADCReading[0];           //RAM Address of ADC Data, must be reset every conversion
+        ADC10SA = (unsigned)&tempReading;           //RAM Address of ADC Data, must be reset every conversion
         ADC10CTL0 |= (ENC | ADC10SC);                 //Start ADC Conversion
         while (ADC10CTL1 & BUSY);                     //Wait while ADC is busy
-        temp += ADCReading[0];
+        temp += tempReading;
     }
     temp = temp/5; // Average the 5 reading for the three variables
 }
@@ -167,57 +195,3 @@ void UARTSendArray(unsigned char *TxArray){
     }
 
 }
-
-/****************************************************************************************
- * This function takes in the port number and then returns the ADC value of the
- * requested port. Note that the MSP430G2553 only reads ADC values from P1.x. To assign
- * a port, simply use a 4-digit hex number, with the desired port number as the first
- * digit. Example: I want to use port 1.1, so I pass in the value 0x1000 as the port
- * value.
- ***************************************************************************************/
-/*int getADCValue(int port)
-{
-    int ADCValue = 0;
-
-    ADC10CTL0 = CONSEQ_1; //Various analog reading selections
-    ADC10CTL1 = port; //Get data from the selected port
-    ADC10AE0 = port; // Signal that we are ready to start
-    ADC10CTL0 |= ADC10SHT_2 | MSC | ADC10ON; // Sampling and conversion start
-
-    while (ADC10CTL1 & 0x0001); // Wait for conversion to complete - ADC10BUSY?
-    ADCValue = ADC10MEM; // Read ADC value
-
-    return ADCValue;
-}*/
-/****************************************************************************************
- * This function returns the current engine temperature by checking the current voltage
- * across the resistor bridge. The voltage is sensed via an ADC port. The port can
- * be redefined by changing the engineTempPort value.
- ***************************************************************************************/
-/*int getEngineTemp()
-{
-    const int port1_3 = BIT3; //This is Temporary! Change this back to port 1.6 when we are ready for final implementation
-    //temp = 0;
-
-    ADCReading = getADCValue(port1_3);
-
-    //currentTemp /= 6.8; //Until I calibrate the sensor, this is just a wild guess.
-
-    return ADCReading; //Value is returned as a Fahrenheit temperature.
-}*/
-
-/****************************************************************************************
- * As above, this function fetches the boost pressure from an ADC port, and then converts
- * the value to a value in PSI. boostPort indicates which port is being read from.
- ***************************************************************************************/
-/*int getBoostPressure()
-{
-    const int boostPort = 0x7000;
-    int currentBoost = 0;
-
-    currentBoost = getADCValue(boostPort);
-
-    currentBoost /= 399;
-
-    return currentBoost;
-}*/
