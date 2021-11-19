@@ -4,6 +4,7 @@
  * Raphael Valente
  */
 
+#include <stdio.h>
 #include <msp430.h> 
 #include <string.h>
 
@@ -11,6 +12,8 @@
 #define UARTReceive UCA0RXBUF;                  // Set RXD as UARTReceive
 
 // Prototypes
+void int_char(int tempCopy);
+void UARTSendTemp(char *tempArray);
 void UARTSendArray(unsigned char *TxArray);
 void UARTSendChar(unsigned char *c);
 void configureADC();
@@ -23,6 +26,9 @@ void ADC_Reading_touch();
 
 // RXD Data variable
 static unsigned char data;
+
+// Temperature String
+char tempStr[3];
 
 // Flags
 int alarmFlag = 0;
@@ -250,19 +256,19 @@ __interrupt void USCI0RX_ISR(void)
             alarmFlag = 0;
             P1OUT &= ~BIT7;
             TA1CCR1 = 1700;
-            TA1CCTL1 = OUTMOD_7;  //CCR1 selection reset-set
+            TA1CCTL1 = OUTMOD_7;                            //CCR1 selection reset-set
             TA1CTL = TASSEL_2|MC_1;
             UARTSendArray("System locked");
             UARTSendArray("\n");
-            __delay_cycles(2000000);            // for 2 seconds
+            __delay_cycles(2000000);                        // for 2 seconds
         }
         break;
-        case 'A':   //
+        case 'A':   // Test Alarm
         {
             UARTSendArray("Testing Alarm");
             UARTSendArray("\n");
-            P1OUT |=  BIT7;                       // Toggle Buzzer
-            __delay_cycles(1000000);               // For 1 Second
+            P1OUT |=  BIT7;                                 // Toggle Buzzer
+            __delay_cycles(1000000);                        // For 1 Second
             P1OUT &= ~BIT7;
         }
         break;
@@ -274,16 +280,37 @@ __interrupt void USCI0RX_ISR(void)
             P1OUT &= ~BIT7;                                 // Turn off LED P1.6
         }
         break;
+        case 't':
+        {
+            int tempCopy = temp/3.37;
+            int_char(tempCopy);
+            UARTSendTemp(tempStr);
+            UARTSendArray("\n");
+        }
+        break;
 
     }
 
-    IFG2 &= ~UCA0RXIFG;             // Turn off interrupt flag
+    IFG2 &= ~UCA0RXIFG;                                     // Turn off interrupt flag
 
 }
 
 #pragma vector = ADC10_VECTOR
 __interrupt void ADC10_ISR(void)
 {
+}
+
+/*Convert the int value to char string*/
+void int_char(int tempCopy)
+{
+    int s=0;
+    s=tempCopy%10;
+    tempStr[1]=(char)(s+48);
+    tempCopy=tempCopy/10;
+    s=tempCopy%10;
+    tempStr[0]=(char)(s+48);
+    tempCopy=tempCopy/10;
+    tempStr[2]='\0';
 }
 
 void configureADC(){
@@ -368,6 +395,14 @@ void ADC_Reading_touch() {
         touch = ADC10MEM;
     }
     touch = touch/5;
+}
+
+void UARTSendTemp(char *tempArray) {
+    while(*tempArray){                        // Loop until StringLength == 0 and post decrement
+        while(!(IFG2 & UCA0TXIFG));         // Wait for TX buffer to be ready for new data
+        UCA0TXBUF = *tempArray;
+        tempArray++;
+    }
 }
 
 void UARTSendChar(unsigned char *c){
