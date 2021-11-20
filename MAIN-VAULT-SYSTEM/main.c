@@ -12,6 +12,8 @@
 #define UARTReceive UCA0RXBUF;                  // Set RXD as UARTReceive
 
 // Prototypes
+void servoUnlock();
+void servoLock();
 void int_char(int tempCopy);
 void UARTSendTemp(char *tempArray);
 void UARTSendArray(unsigned char *TxArray);
@@ -31,11 +33,11 @@ static unsigned char data;
 char tempStr[3];
 
 // Flags
-int alarmFlag = 0;
-int lockFlag = 0;
-int unlockFlag = 0;
-int tempFlag = 0;
-int touchFlag = 0;
+int alarmFlag = 0;          // 0: Alarm Off               | 1: Motion is Detected/Alarm On
+int lockFlag = 0;           // 0: System is Unlocked      | 1: System is Fully Locked
+int unlockFlag = 0;         // 0: Vault Physically Locked | 1: Vault Physically Unlocked
+int tempFlag = 0;           // 0: Temp Alarm Off          | 1: Temp Alarm On
+int touchFlag = 0;          // 0: No Touch is Detected    | 1: Touch is Detected
 
 // Iterator
 int i = 0;
@@ -86,9 +88,7 @@ void main(void)
     TA1CCR0 = 20000;                           //PWM period
 
     // Starts program in Locked Mode
-    TA1CCR1 = 1700;
-    TA1CCTL1 = OUTMOD_7;                       //CCR1 selection reset-set
-    TA1CTL = TASSEL_2|MC_1;
+    servoLock();
     lockFlag = 1;
 
     __delay_cycles(2000000);
@@ -114,13 +114,11 @@ void main(void)
         getanalogvalues();
 
         // toggles servo mechanism with touch sensor
-        if (touch <= touchroom*0.5) {
+        if (touch <= touchroom*0.35) {
             // unlocks door when unlocked through app
             if (touchFlag == 0 && lockFlag == 0 && unlockFlag == 0) {
                 touchFlag = 1;
-                TA1CCR1 = 700;              //CCR1 PWM Duty Cycle
-                TA1CCTL1 = OUTMOD_7;        //CCR1 selection reset-set
-                TA1CTL = TASSEL_2|MC_1;     //SMCLK submain clock,upmode
+                servoUnlock();
                 unlockFlag = 1;
                 UARTSendArray("Door is unlocked");
                 UARTSendArray("\n");
@@ -129,9 +127,7 @@ void main(void)
             // locks door after servo physically unlocks door
             if (touchFlag == 0 && unlockFlag == 1) {
                 touchFlag = 1;
-                TA1CCR1 = 1700;
-                TA1CCTL1 = OUTMOD_7;        //CCR1 selection reset-set
-                TA1CTL = TASSEL_2|MC_1;
+                servoLock();
                 lockFlag = 1;
                 unlockFlag = 0;
                 UARTSendArray("System locked");
@@ -255,9 +251,7 @@ __interrupt void USCI0RX_ISR(void)
             unlockFlag = 0;
             alarmFlag = 0;
             P1OUT &= ~BIT7;
-            TA1CCR1 = 1700;
-            TA1CCTL1 = OUTMOD_7;                            //CCR1 selection reset-set
-            TA1CTL = TASSEL_2|MC_1;
+            servoLock();
             UARTSendArray("System locked");
             UARTSendArray("\n");
             __delay_cycles(2000000);                        // for 2 seconds
@@ -272,15 +266,15 @@ __interrupt void USCI0RX_ISR(void)
             P1OUT &= ~BIT7;
         }
         break;
-        case 'a':   //
+        case 'a':   // Shut off Alarm
         {
             UARTSendArray("Alarm is off");
             UARTSendArray("\n");
             alarmFlag = 0;
-            P1OUT &= ~BIT7;                                 // Turn off LED P1.6
+            P1OUT &= ~BIT7;                                 // Turn off LED P1.7
         }
         break;
-        case 't':
+        case 't':   // Send Converted Temperature
         {
             int tempCopy = temp/3.37;
             int_char(tempCopy);
@@ -300,17 +294,29 @@ __interrupt void ADC10_ISR(void)
 {
 }
 
+void servoUnlock(){
+    TA1CCR1 = 700;              //CCR1 PWM Duty Cycle
+    TA1CCTL1 = OUTMOD_7;        //CCR1 selection reset-set
+    TA1CTL = TASSEL_2|MC_1;     //SMCLK submain clock,upmode
+}
+
+void servoLock(){
+    TA1CCR1 = 1700;
+    TA1CCTL1 = OUTMOD_7;                            //CCR1 selection reset-set
+    TA1CTL = TASSEL_2|MC_1;
+}
+
 /*Convert the int value to char string*/
 void int_char(int tempCopy)
 {
-    int s=0;
-    s=tempCopy%10;
-    tempStr[1]=(char)(s+48);
-    tempCopy=tempCopy/10;
-    s=tempCopy%10;
-    tempStr[0]=(char)(s+48);
-    tempCopy=tempCopy/10;
-    tempStr[2]='\0';
+    int s = 0;
+    s = tempCopy%10;
+    tempStr[1] = (char)(s+48);
+    tempCopy = tempCopy/10;
+    s = tempCopy%10;
+    tempStr[0] = (char)(s+48);
+    tempCopy = tempCopy/10;
+    tempStr[2] = '\0';
 }
 
 void configureADC(){
