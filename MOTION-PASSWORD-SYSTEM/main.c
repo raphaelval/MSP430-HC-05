@@ -88,40 +88,49 @@ void main(void)
         getanalogvalues();
 
         /* PASSWORD VERFICATION */
-        if (x_axis > x_axis_init*1.04 || pin1 == 1) {
+        if (x_axis > x_axis_init*1.02 || pin1 == 1) {
             if (pin1 == 0) {
                 P1OUT |= BIT0;
                 P1OUT |= BIT7;
+                UARTSendArray("1");                     // Send Correct PIN1 to App
+                UARTSendArray("\n");
                 __delay_cycles(500000);
+                getanalogvalues();
                 P1OUT &= ~BIT0;
                 P1OUT &= ~BIT7;
             }
 
             pin1 = 1;
-            if (z_axis > z_axis_init*1.10 || pin2 == 1) {
+            if (z_axis > z_axis_init*1.2 || pin2 == 1) {
                 if(pin2 == 0) {
                     P1OUT |= BIT0;
                     P1OUT |= BIT7;
+                    UARTSendArray("2");                 // Send Correct PIN2 to App
+                    UARTSendArray("\n");
                     __delay_cycles(500000);
+                    getanalogvalues();
                     P1OUT &= ~BIT0;
                     P1OUT &= ~BIT7;
                 }
 
                 pin2 = 1;
-                if (x_axis < x_axis_init*0.96 || pin3 == 1) {
+                if (x_axis < x_axis_init*0.98 || pin3 == 1) {
                     if(pin3 == 0) {
                         P1OUT |= BIT0;
                         P1OUT |= BIT7;
+                        UARTSendArray("3");             // Send Correct PIN3 to App
+                        UARTSendArray("\n");
                         __delay_cycles(500000);
+                        getanalogvalues();
                         P1OUT &= ~BIT0;
                         P1OUT &= ~BIT7;
                     }
 
                     pin3 = 1;
-                    if (z_axis < z_axis_init*0.90) {
+                    if (z_axis < z_axis_init*0.8) {
                         P1OUT |= BIT0;
                         P1OUT |= BIT7;
-                        UARTSendArray("SUCCESS: Password Correct");
+                        UARTSendArray("T");             // Send Correct Password to App
                         UARTSendArray("\n");
                         __delay_cycles(500000);
                         P1OUT &= ~BIT7;
@@ -135,13 +144,13 @@ void main(void)
                         pin3 = 0;
                         pin4 = 0;
                     }
-                } else if (x_axis > x_axis_init*1.05 || z_axis < z_axis_init*0.87 ||
-                           z_axis > z_axis_init*1.13) {
+                } else if (x_axis > x_axis_init*1.02 || z_axis < z_axis_init*0.80 ||
+                           z_axis > z_axis_init*1.20) {
                     pin1 = 0;
                     pin2 = 0;
                     pin3 = 0;
                     P1OUT |= BIT6;
-                    UARTSendArray("ERROR: Password Incorrect");
+                    UARTSendArray("X");                    // Send incorrect password to App
                     UARTSendArray("\n");
                     __delay_cycles(2000000);
                     P1OUT &= ~BIT6;
@@ -151,12 +160,12 @@ void main(void)
                     P1OUT &= ~BIT0;
                     P1OUT &= ~BIT7;
                 }
-            } else if (x_axis < x_axis_init*0.95 || z_axis < z_axis_init*0.87 ||
+            } else if (x_axis < x_axis_init*0.98 || z_axis < z_axis_init*0.80 ||
                        x_axis > x_axis_init*1.05) {
                 pin1 = 0;
                 pin2 = 0;
                 P1OUT |= BIT6;
-                UARTSendArray("ERROR: Password Incorrect");
+                UARTSendArray("X");                         // Send incorrect password to App
                 UARTSendArray("\n");
                 __delay_cycles(2000000);
                 P1OUT &= ~BIT6;
@@ -166,11 +175,11 @@ void main(void)
                 P1OUT &= ~BIT0;
                 P1OUT &= ~BIT7;
             }
-        } else if (x_axis < x_axis_init*0.95 || z_axis < z_axis_init*0.87 ||
-                   z_axis > z_axis_init*1.13) {
+        } else if (x_axis < x_axis_init*0.98 || z_axis < z_axis_init*0.80 ||
+                   z_axis > z_axis_init*1.20) {
             pin1 = 0;
             P1OUT |= BIT6;
-            UARTSendArray("ERROR: Password Incorrect");
+            UARTSendArray("X");                             // Send incorrect password to App
             UARTSendArray("\n");
             __delay_cycles(2000000);
             P1OUT &= ~BIT6;
@@ -190,7 +199,7 @@ __interrupt void USCI0RX_ISR(void)
     unsigned int bytesToSend = strlen((const char*) data);  // Number of bytes in data;
 
     switch(data){                                           // You chose "data"
-        case 'E':   //
+        case 'E':   // Example Case for debugging Serial Terminal
         {
             UARTSendArray("Example Text");
             UARTSendArray("\n");
