@@ -114,7 +114,7 @@ void main(void)
         getanalogvalues();
 
         // toggles servo mechanism with touch sensor
-        if (touch <= touchroom*0.35) {
+        if (touch <= touchroom*0.70) {
             // unlocks door when unlocked through app
             if (touchFlag == 0 && lockFlag == 0 && unlockFlag == 0) {
                 touchFlag = 1;
@@ -132,6 +132,7 @@ void main(void)
                 unlockFlag = 0;
                 UARTSendArray("System locked");
                 UARTSendArray("\n");
+                __delay_cycles(2000000);    // delay touch 2 seconds after locking
             }
         } // toggles flag to 0 when not touching
         else if (touch >= touchroom*0.9) {
@@ -144,7 +145,7 @@ void main(void)
                 z_axis > z_axis_init*1.04 || z_axis < z_axis_init*0.96) &&
                 lockFlag == 1) {
             if (alarmFlag == 0) {
-                UARTSendArray("ALERT: Vault was displaced");
+                UARTSendArray("alert: Vault was displaced");
                 UARTSendArray("\n");
                 alarmFlag = 1;
             }
@@ -154,7 +155,7 @@ void main(void)
         if(temp > temproom*1.05) {
             // sets tempflag to 1
             if(tempFlag == 0) {
-                UARTSendArray("ALERT: Temperature is high");
+                UARTSendArray("alert: temperature is high");
                 UARTSendArray("\n");
                 tempFlag = 1;
             }
@@ -199,39 +200,9 @@ __interrupt void USCI0RX_ISR(void)
     data = UARTReceive;                                     // Receives data from UART RXD
     unsigned int bytesToSend = strlen((const char*) data);  // Number of bytes in data;
 
-    switch(data){                                           // You chose "data"
-        case 'G':   //
-        {
-            UARTSendArray("Green LED is on");
-            UARTSendArray("\n");
-            //P1OUT |= BIT0;                                // Turn on LED P1.0
-        }
-        break;
-        case 'g':   //
-        {
-            UARTSendArray("Green LED is off");
-            UARTSendArray("\n");
-            //P1OUT &= ~BIT0;                               // Turn off LED P1.0
-        }
-        break;
-        case 'R':   //
-        {
-            UARTSendArray("Red LED is on");
-            UARTSendArray("\n");
-            P1OUT |= BIT6;                                  // Turn on LED P1.6
-        }
-        break;
-        case 'r':   //
-        {
-            UARTSendArray("Red LED is off");
-            UARTSendArray("\n");
-            P1OUT &= ~BIT6;                                 // Turn off LED P1.6
-        }
-        break;
+    switch(data){
         case 'u':   // Unlock
         {
-            //UARTSendArray("Unlocked");
-            UARTSendArray("T");
             UARTSendArray("\n");
             // UNLOCK
             lockFlag = 0;
@@ -243,8 +214,6 @@ __interrupt void USCI0RX_ISR(void)
         break;
         case 'l':   // Lock
         {
-            //UARTSendArray("Locked");
-            UARTSendArray("T");
             UARTSendArray("\n");
             // LOCK
             lockFlag = 1;
@@ -259,7 +228,7 @@ __interrupt void USCI0RX_ISR(void)
         break;
         case 'A':   // Test Alarm
         {
-            UARTSendArray("Testing Alarm");
+            UARTSendArray("testing alarm");
             UARTSendArray("\n");
             P1OUT |=  BIT7;                                 // Toggle Buzzer
             __delay_cycles(1000000);                        // For 1 Second
@@ -276,6 +245,7 @@ __interrupt void USCI0RX_ISR(void)
         break;
         case 't':   // Send Converted Temperature
         {
+            UARTSendArray("*");
             int tempCopy = temp/3.37;
             int_char(tempCopy);
             UARTSendTemp(tempStr);
@@ -295,18 +265,18 @@ __interrupt void ADC10_ISR(void)
 }
 
 void servoUnlock(){
-    TA1CCR1 = 700;              //CCR1 PWM Duty Cycle
-    TA1CCTL1 = OUTMOD_7;        //CCR1 selection reset-set
-    TA1CTL = TASSEL_2|MC_1;     //SMCLK submain clock,upmode
+    TA1CCR1 = 2700;                                 //CCR1 PWM Duty Cycle
+    TA1CCTL1 = OUTMOD_7;                            //CCR1 selection reset-set
+    TA1CTL = TASSEL_2|MC_1;                         //SMCLK submain clock,upmode
 }
 
 void servoLock(){
-    TA1CCR1 = 1700;
+    TA1CCR1 = 1600;
     TA1CCTL1 = OUTMOD_7;                            //CCR1 selection reset-set
     TA1CTL = TASSEL_2|MC_1;
 }
 
-/*Convert the int value to char string*/
+/* Convert the int value to char string */
 void int_char(int tempCopy)
 {
     int s = 0;
